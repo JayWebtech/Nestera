@@ -264,3 +264,24 @@ fn test_xdr_compatibility_all_plan_types() {
         assert_eq!(group_plan, retrieved);
     });
 }
+
+#[test]
+fn test_completed_plan() {
+    let plan = SavingsPlan {
+        plan_id: 5,
+        plan_type: PlanType::Goal(
+            symbol_short!("house"),
+            10_000_000,
+            2u32
+        ),
+        balance: 10_000_000,
+        start_time: 1000000,
+        last_deposit: 2000000,
+        last_withdraw: 0,
+        interest_rate: 650,
+        is_completed: true,
+    };
+    
+    assert!(plan.is_completed);
+    assert_eq!(plan.balance, 10_000_000);
+}
