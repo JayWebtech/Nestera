@@ -188,6 +188,7 @@ fn test_xdr_compatibility_savings_plan() {
     });
 }
 
+#[test]
 fn test_xdr_compatibility_all_plan_types() {
     let env = Env::default();
     let contract_id = env.register(NesteraContract, ());
