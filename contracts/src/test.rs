@@ -42,7 +42,7 @@ fn test_lock_savings_plan() {
         start_time: 1000000,
         last_deposit: 1000000,
         last_withdraw: 0,
-        interest_rate: 800, // 8.00% APY
+        interest_rate: 800,
         is_completed: false,
     };
     
@@ -50,5 +50,32 @@ fn test_lock_savings_plan() {
     match plan.plan_type {
         PlanType::Lock(until) => assert_eq!(until, locked_until),
         _ => panic!("Expected Lock plan type"),
+    }
+}
+
+fn test_goal_savings_plan() {
+    let plan = SavingsPlan {
+        plan_id: 3,
+        plan_type: PlanType::Goal(
+            symbol_short!("education"),
+            5_000_000,
+            1u32, // e.g. 1 = weekly
+        ),
+        balance: 2_000_000,
+        start_time: 1000000,
+        last_deposit: 1500000,
+        last_withdraw: 0,
+        interest_rate: 600,
+        is_completed: false,
+    };
+    
+    assert_eq!(plan.plan_id, 3);
+    match plan.plan_type {
+        PlanType::Goal(category, target_amount, contribution_type) => {
+            assert_eq!(category, symbol_short!("education"));
+            assert_eq!(target_amount, 5_000_000);
+            assert_eq!(contribution_type, 1u32);
+        },
+        _ => panic!("Expected Goal plan type"),
     }
 }
