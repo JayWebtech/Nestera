@@ -1,6 +1,9 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl};
 
+mod storage_types;
+pub use storage_types::*;
+
 #[contract]
 pub struct NesteraContract;
 
@@ -14,8 +17,6 @@ pub struct NesteraContract;
 // Refer to the official documentation:
 // <https://developers.stellar.org/docs/build/smart-contracts/overview>.
 #[contractimpl]
-impl NesteraContract {
-
-}
+impl NesteraContract {}
 
 mod test;
