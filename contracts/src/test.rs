@@ -129,3 +129,19 @@ fn test_data_key_user() {
         _ => panic!("Expected User data key"),
     }
 }
+
+#[test]
+fn test_data_key_savings_plan() {
+    let env = Env::default();
+    let user_address = Address::generate(&env);
+    let plan_id = 42;
+    let key = DataKey::SavingsPlan(user_address.clone(), plan_id);
+    
+    match key {
+        DataKey::SavingsPlan(addr, id) => {
+            assert_eq!(addr, user_address);
+            assert_eq!(id, plan_id);
+        },
+        _ => panic!("Expected SavingsPlan data key"),
+    }
+}
