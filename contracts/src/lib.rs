@@ -5,6 +5,9 @@ use soroban_sdk::{contract, contractimpl};
 mod storage_types;
 pub use storage_types::*;
 
+mod errors;
+pub use errors::*;
+
 #[contract]
 pub struct NesteraContract;
 
