@@ -131,11 +131,7 @@ pub fn withdraw_completed_goal_save(
     Ok(goal_save.current_amount)
 }
 
-pub fn break_goal_save(
-    env: &Env,
-    user: Address,
-    goal_id: u64,
-) -> Result<(), SavingsError> {
+pub fn break_goal_save(env: &Env, user: Address, goal_id: u64) -> Result<(), SavingsError> {
     user.require_auth();
 
     if !users::user_exists(env, &user) {
@@ -177,9 +173,7 @@ pub fn break_goal_save(
 }
 
 pub fn get_goal_save(env: &Env, goal_id: u64) -> Option<GoalSave> {
-    env.storage()
-        .persistent()
-        .get(&DataKey::GoalSave(goal_id))
+    env.storage().persistent().get(&DataKey::GoalSave(goal_id))
 }
 
 pub fn get_user_goal_saves(env: &Env, user: &Address) -> Vec<u64> {
@@ -214,7 +208,7 @@ fn add_goal_to_user(env: &Env, user: &Address, goal_id: u64) {
 fn remove_goal_from_user(env: &Env, user: &Address, goal_id: u64) {
     let user_goals = get_user_goal_saves(env, user);
     let mut new_goals = Vec::new(env);
-    
+
     for i in 0..user_goals.len() {
         if let Some(id) = user_goals.get(i) {
             if id != goal_id {
@@ -222,7 +216,7 @@ fn remove_goal_from_user(env: &Env, user: &Address, goal_id: u64) {
             }
         }
     }
-    
+
     env.storage()
         .persistent()
         .set(&DataKey::UserGoalSaves(user.clone()), &new_goals);
@@ -230,8 +224,8 @@ fn remove_goal_from_user(env: &Env, user: &Address, goal_id: u64) {
 
 #[cfg(test)]
 mod tests {
-    use soroban_sdk::{testutils::Address as _, Address, Env, Symbol};
     use crate::{NesteraContract, NesteraContractClient};
+    use soroban_sdk::{testutils::Address as _, Address, Env, Symbol};
 
     fn setup_test_env() -> (Env, NesteraContractClient<'static>) {
         let env = Env::default();
@@ -244,17 +238,17 @@ mod tests {
     fn test_create_goal_save_success() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user);
-        
+
         let goal_name = Symbol::new(&env, "vacation");
         let target = 10000i128;
         let initial = 1000i128;
-        
+
         let goal_id = client.create_goal_save(&user, &goal_name, &target, &initial);
         assert_eq!(goal_id, 1);
-        
+
         let goal_save = client.get_goal_save(&goal_id);
         assert_eq!(goal_save.owner, user);
         assert_eq!(goal_save.target_amount, target);
@@ -267,17 +261,17 @@ mod tests {
     fn test_deposit_to_goal_save() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user);
-        
+
         let goal_name = Symbol::new(&env, "house");
         let target = 5000i128;
         let initial = 1000i128;
-        
+
         let goal_id = client.create_goal_save(&user, &goal_name, &target, &initial);
         client.deposit_to_goal_save(&user, &goal_id, &2000);
-        
+
         let goal_save = client.get_goal_save(&goal_id);
         assert_eq!(goal_save.current_amount, 3000);
         assert!(!goal_save.is_completed);
@@ -287,17 +281,17 @@ mod tests {
     fn test_goal_completion_on_deposit() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user);
-        
+
         let goal_name = Symbol::new(&env, "laptop");
         let target = 5000i128;
         let initial = 3000i128;
-        
+
         let goal_id = client.create_goal_save(&user, &goal_name, &target, &initial);
         client.deposit_to_goal_save(&user, &goal_id, &2000);
-        
+
         let goal_save = client.get_goal_save(&goal_id);
         assert_eq!(goal_save.current_amount, 5000);
         assert!(goal_save.is_completed);
@@ -307,22 +301,22 @@ mod tests {
     fn test_withdraw_completed_goal_save_success() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user);
-        
+
         let goal_name = Symbol::new(&env, "car");
         let target = 1000i128;
         let initial = 1000i128;
-        
+
         let goal_id = client.create_goal_save(&user, &goal_name, &target, &initial);
-        
+
         let goal_save = client.get_goal_save(&goal_id);
         assert!(goal_save.is_completed);
-        
+
         let amount = client.withdraw_completed_goal_save(&user, &goal_id);
         assert_eq!(amount, 1000);
-        
+
         let goal_save_after = client.get_goal_save(&goal_id);
         assert!(goal_save_after.is_withdrawn);
     }
@@ -332,16 +326,16 @@ mod tests {
     fn test_withdraw_incomplete_goal_fails() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user);
-        
+
         let goal_name = Symbol::new(&env, "bike");
         let target = 5000i128;
         let initial = 1000i128;
-        
+
         let goal_id = client.create_goal_save(&user, &goal_name, &target, &initial);
-        
+
         client.withdraw_completed_goal_save(&user, &goal_id);
     }
 
@@ -350,14 +344,14 @@ mod tests {
     fn test_withdraw_already_withdrawn_fails() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user);
-        
+
         let goal_name = Symbol::new(&env, "fund");
         let target = 1000i128;
         let initial = 1000i128;
-        
+
         let goal_id = client.create_goal_save(&user, &goal_name, &target, &initial);
         client.withdraw_completed_goal_save(&user, &goal_id);
         client.withdraw_completed_goal_save(&user, &goal_id);
@@ -369,15 +363,15 @@ mod tests {
         let (env, client) = setup_test_env();
         let user1 = Address::generate(&env);
         let user2 = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user1);
         client.initialize_user(&user2);
-        
+
         let goal_name = Symbol::new(&env, "test");
         let target = 1000i128;
         let initial = 1000i128;
-        
+
         let goal_id = client.create_goal_save(&user1, &goal_name, &target, &initial);
         client.withdraw_completed_goal_save(&user2, &goal_id);
     }
@@ -386,20 +380,20 @@ mod tests {
     fn test_break_goal_save_success() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user);
-        
+
         let goal_name = Symbol::new(&env, "emergency");
         let target = 5000i128;
         let initial = 2000i128;
-        
+
         let goal_id = client.create_goal_save(&user, &goal_name, &target, &initial);
         client.break_goal_save(&user, &goal_id);
-        
+
         let goal_save = client.get_goal_save(&goal_id);
         assert!(goal_save.is_withdrawn);
-        
+
         let user_goals = client.get_user_goal_saves(&user);
         assert_eq!(user_goals.len(), 0);
     }
@@ -409,14 +403,14 @@ mod tests {
     fn test_break_completed_goal_fails() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user);
-        
+
         let goal_name = Symbol::new(&env, "done");
         let target = 1000i128;
         let initial = 1000i128;
-        
+
         let goal_id = client.create_goal_save(&user, &goal_name, &target, &initial);
         client.break_goal_save(&user, &goal_id);
     }
@@ -427,15 +421,15 @@ mod tests {
         let (env, client) = setup_test_env();
         let user1 = Address::generate(&env);
         let user2 = Address::generate(&env);
-        
+
         env.mock_all_auths();
         client.initialize_user(&user1);
         client.initialize_user(&user2);
-        
+
         let goal_name = Symbol::new(&env, "other");
         let target = 5000i128;
         let initial = 2000i128;
-        
+
         let goal_id = client.create_goal_save(&user1, &goal_name, &target, &initial);
         client.break_goal_save(&user2, &goal_id);
     }

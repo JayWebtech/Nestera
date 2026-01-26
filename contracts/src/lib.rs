@@ -285,7 +285,7 @@ impl NesteraContract {
         flexi::flexi_withdraw(env, user, amount)
     }
 
-  /// VIEW FUNCTION
+    /// VIEW FUNCTION
     pub fn get_flexi_balance(env: Env, user: Address) -> i128 {
         flexi::get_flexi_balance(&env, user).unwrap()
     }
@@ -365,8 +365,7 @@ impl NesteraContract {
     /// # Panics
     /// Panics if withdrawal conditions are not met
     pub fn withdraw_lock_save(env: Env, user: Address, lock_id: u64) -> i128 {
-        lock::withdraw_lock_save(&env, user, lock_id)
-            .unwrap_or_else(|e| panic_with_error!(&env, e))
+        lock::withdraw_lock_save(&env, user, lock_id).unwrap_or_else(|e| panic_with_error!(&env, e))
     }
 
     // ========== Goal Save Functions ==========
@@ -393,8 +392,7 @@ impl NesteraContract {
     }
 
     pub fn break_goal_save(env: Env, user: Address, goal_id: u64) {
-        goal::break_goal_save(&env, user, goal_id)
-            .unwrap_or_else(|e| panic_with_error!(&env, e))
+        goal::break_goal_save(&env, user, goal_id).unwrap_or_else(|e| panic_with_error!(&env, e))
     }
 
     pub fn get_goal_save(env: Env, goal_id: u64) -> GoalSave {
