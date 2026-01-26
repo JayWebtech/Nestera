@@ -55,6 +55,21 @@ pub struct LockSave {
     pub is_withdrawn: bool,
 }
 
+/// Represents a Goal Save plan with target amount
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GoalSave {
+    pub id: u64,
+    pub owner: Address,
+    pub goal_name: Symbol,
+    pub target_amount: i128,
+    pub current_amount: i128,
+    pub interest_rate: u32,
+    pub start_time: u64,
+    pub is_completed: bool,
+    pub is_withdrawn: bool,
+}
+
 /// Storage keys for the contract's persistent data
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -73,6 +88,12 @@ pub enum DataKey {
     UserLockSaves(Address),
     /// Stores the next auto-incrementing LockSave ID
     NextLockId,
+    /// Maps goal plan ID to GoalSave struct
+    GoalSave(u64),
+    /// Maps user to a list of their GoalSave IDs
+    UserGoalSaves(Address),
+    /// Stores the next auto-incrementing GoalSave ID
+    NextGoalId,
 }
 
 /// Payload structure that the admin signs off-chain

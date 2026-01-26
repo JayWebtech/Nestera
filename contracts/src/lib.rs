@@ -1,6 +1,7 @@
 #![no_std]
 #![allow(non_snake_case)]
 mod flexi;
+mod goal;
 mod lock;
 mod storage_types;
 mod users;
@@ -11,7 +12,7 @@ use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short, xdr::ToXdr, Address, Bytes, BytesN,
     Env, Symbol, Vec,
 };
-pub use storage_types::{DataKey, LockSave, MintPayload, PlanType, SavingsPlan};
+pub use storage_types::{DataKey, GoalSave, LockSave, MintPayload, PlanType, SavingsPlan};
 
 /// Custom error codes for the contract
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -366,6 +367,43 @@ impl NesteraContract {
     pub fn withdraw_lock_save(env: Env, user: Address, lock_id: u64) -> i128 {
         lock::withdraw_lock_save(&env, user, lock_id)
             .unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    // ========== Goal Save Functions ==========
+
+    pub fn create_goal_save(
+        env: Env,
+        user: Address,
+        goal_name: Symbol,
+        target_amount: i128,
+        initial_deposit: i128,
+    ) -> u64 {
+        goal::create_goal_save(&env, user, goal_name, target_amount, initial_deposit)
+            .unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    pub fn deposit_to_goal_save(env: Env, user: Address, goal_id: u64, amount: i128) {
+        goal::deposit_to_goal_save(&env, user, goal_id, amount)
+            .unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    pub fn withdraw_completed_goal_save(env: Env, user: Address, goal_id: u64) -> i128 {
+        goal::withdraw_completed_goal_save(&env, user, goal_id)
+            .unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    pub fn break_goal_save(env: Env, user: Address, goal_id: u64) {
+        goal::break_goal_save(&env, user, goal_id)
+            .unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    pub fn get_goal_save(env: Env, goal_id: u64) -> GoalSave {
+        goal::get_goal_save(&env, goal_id)
+            .unwrap_or_else(|| panic_with_error!(&env, SavingsError::PlanNotFound))
+    }
+
+    pub fn get_user_goal_saves(env: Env, user: Address) -> Vec<u64> {
+        goal::get_user_goal_saves(&env, &user)
     }
 }
 
