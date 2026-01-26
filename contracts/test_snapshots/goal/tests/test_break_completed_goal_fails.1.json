@@ -6,7 +6,6 @@
   },
   "auth": [
     [],
-    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
@@ -33,16 +32,19 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "create_lock_save",
+              "function_name": "create_goal_save",
               "args": [
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
+                  "symbol": "done"
+                },
+                {
                   "i128": "1000"
                 },
                 {
-                  "u64": "86400"
+                  "i128": "1000"
                 }
               ]
             }
@@ -70,7 +72,7 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "LockSave"
+                  "symbol": "GoalSave"
                 },
                 {
                   "u64": "1"
@@ -90,7 +92,7 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "LockSave"
+                      "symbol": "GoalSave"
                     },
                     {
                       "u64": "1"
@@ -102,10 +104,18 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "amount"
+                        "symbol": "current_amount"
                       },
                       "val": {
                         "i128": "1000"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "goal_name"
+                      },
+                      "val": {
+                        "symbol": "done"
                       }
                     },
                     {
@@ -126,18 +136,18 @@
                     },
                     {
                       "key": {
-                        "symbol": "is_withdrawn"
+                        "symbol": "is_completed"
                       },
                       "val": {
-                        "bool": false
+                        "bool": true
                       }
                     },
                     {
                       "key": {
-                        "symbol": "maturity_time"
+                        "symbol": "is_withdrawn"
                       },
                       "val": {
-                        "u64": "86400"
+                        "bool": false
                       }
                     },
                     {
@@ -154,6 +164,14 @@
                       },
                       "val": {
                         "u64": "0"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "target_amount"
+                      },
+                      "val": {
+                        "i128": "1000"
                       }
                     }
                   ]
@@ -172,7 +190,7 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "NextLockId"
+                  "symbol": "NextGoalId"
                 }
               ]
             },
@@ -189,7 +207,7 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "NextLockId"
+                      "symbol": "NextGoalId"
                     }
                   ]
                 },
@@ -273,7 +291,7 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "UserLockSaves"
+                  "symbol": "UserGoalSaves"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -293,7 +311,7 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "UserLockSaves"
+                      "symbol": "UserGoalSaves"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -337,32 +355,7 @@
                     "executable": {
                       "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                     },
-                    "storage": [
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "AdminPublicKey"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "bytes": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664"
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "Initialized"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "bool": true
-                        }
-                      }
-                    ]
+                    "storage": null
                   }
                 }
               }

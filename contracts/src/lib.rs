@@ -1,6 +1,9 @@
 #![no_std]
 #![allow(non_snake_case)]
 mod flexi;
+mod goal;
+mod group;
+mod lock;
 mod storage_types;
 mod users;
 mod views;
@@ -9,10 +12,11 @@ pub use crate::errors::SavingsError;
 pub use crate::storage_types::User;
 use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short, xdr::ToXdr, Address, Bytes, BytesN,
-    Env, Symbol, Vec,
+    Env, String, Symbol, Vec,
 };
 pub use storage_types::{
-    DataKey, GoalSave, GroupSave, LockSave, MintPayload, PlanType, SavingsPlan,
+    DataKey, GoalSave, GoalSave, GroupSave, GroupSave, LockSave, LockSave, MintPayload, PlanType,
+    SavingsPlan,
 };
 
 /// Custom error codes for the contract
@@ -362,6 +366,265 @@ impl NesteraContract {
         user: Address,
     ) -> Result<i128, SavingsError> {
         views::get_group_member_contribution(&env, group_id, user)
+    }
+
+    /// VIEW FUNCTION
+    pub fn get_flexi_balance(env: Env, user: Address) -> i128 {
+        flexi::get_flexi_balance(&env, user).unwrap()
+    }
+
+    /// VIEW FUNCTION
+    pub fn has_flexi_balance(env: Env, user: Address) -> bool {
+        flexi::has_flexi_balance(&env, user)
+    }
+
+    /// Creates a new group savings plan.
+    /// The creator becomes the first member of the group.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `creator` - The address of the user creating the group
+    /// * `title` - Title/name of the group savings plan
+    /// * `description` - Description of the group savings goal
+    /// * `category` - Category of the group savings
+    /// * `target_amount` - Target amount to save (must be > 0)
+    /// * `contribution_type` - Type of contribution (0 = fixed, 1 = flexible, 2 = percentage)
+    /// * `contribution_amount` - Contribution amount or minimum (must be > 0)
+    /// * `is_public` - Whether the group is public or private
+    /// * `start_time` - Unix timestamp when the group starts
+    /// * `end_time` - Unix timestamp when the group ends
+    ///
+    /// # Returns
+    /// `Ok(u64)` - The unique ID of the created group
+    /// `Err(SavingsError)` - If validation fails
+    pub fn create_group_save(
+        env: Env,
+        creator: Address,
+        title: String,
+        description: String,
+        category: String,
+        target_amount: i128,
+        contribution_type: u32,
+        contribution_amount: i128,
+        is_public: bool,
+        start_time: u64,
+        end_time: u64,
+    ) -> Result<u64, SavingsError> {
+        group::create_group_save(
+            &env,
+            creator,
+            title,
+            description,
+            category,
+            target_amount,
+            contribution_type,
+            contribution_amount,
+            is_public,
+            start_time,
+            end_time,
+        )
+    }
+
+    /// VIEW FUNCTION - Retrieves a group savings plan by ID.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `group_id` - The unique ID of the group
+    ///
+    /// # Returns
+    /// `Some(GroupSave)` if the group exists, `None` otherwise
+    pub fn get_group_save(env: Env, group_id: u64) -> Option<crate::storage_types::GroupSave> {
+        group::get_group_save(&env, group_id)
+    }
+
+    /// VIEW FUNCTION - Checks if a group exists.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `group_id` - The unique ID of the group
+    ///
+    /// # Returns
+    /// `true` if the group exists, `false` otherwise
+    pub fn group_exists(env: Env, group_id: u64) -> bool {
+        group::group_exists(&env, group_id)
+    }
+
+    /// VIEW FUNCTION - Gets all groups that a user participates in.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `user` - The user address
+    ///
+    /// # Returns
+    /// A vector of group IDs the user is involved in
+    pub fn get_user_groups(env: Env, user: Address) -> Vec<u64> {
+        group::get_user_groups(&env, &user)
+    }
+
+    /// Allows a user to join a public group savings plan.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `user` - The address of the user joining the group
+    /// * `group_id` - The ID of the group to join
+    ///
+    /// # Returns
+    /// `Ok(())` on success, panics on error
+    pub fn join_group_save(env: Env, user: Address, group_id: u64) -> Result<(), SavingsError> {
+        group::join_group_save(&env, user, group_id)
+    }
+
+    /// Allows a group member to contribute funds to the group savings plan.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `user` - The address of the user contributing
+    /// * `group_id` - The ID of the group
+    /// * `amount` - The amount to contribute (must be > 0)
+    ///
+    /// # Returns
+    /// `Ok(())` on success, panics on error
+    pub fn contribute_to_group_save(
+        env: Env,
+        user: Address,
+        group_id: u64,
+        amount: i128,
+    ) -> Result<(), SavingsError> {
+        group::contribute_to_group_save(&env, user, group_id, amount)
+    }
+
+    /// VIEW FUNCTION - Gets a member's contribution to a group.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `group_id` - The group ID
+    /// * `user` - The user address
+    ///
+    /// # Returns
+    /// The member's total contribution amount
+    pub fn get_member_contribution(env: Env, group_id: u64, user: Address) -> i128 {
+        group::get_member_contribution(&env, group_id, &user)
+    }
+
+    /// VIEW FUNCTION - Gets all members of a group.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `group_id` - The group ID
+    ///
+    /// # Returns
+    /// A vector of member addresses
+    pub fn get_group_members(env: Env, group_id: u64) -> Vec<Address> {
+        group::get_group_members(&env, group_id)
+    }
+
+    // ========== Lock Save Functions ==========
+
+    /// Creates a new Lock Save plan for a user
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `user` - The address of the user creating the lock save
+    /// * `amount` - The amount to lock (must be positive)
+    /// * `duration` - The lock duration in seconds (must be positive)
+    ///
+    /// # Returns
+    /// The unique lock save ID
+    ///
+    /// # Panics
+    /// Panics on validation errors or if user doesn't exist
+    pub fn create_lock_save(env: Env, user: Address, amount: i128, duration: u64) -> u64 {
+        lock::create_lock_save(&env, user, amount, duration)
+            .unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    /// Checks if a lock save plan has matured
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `lock_id` - The ID of the lock save to check
+    ///
+    /// # Returns
+    /// `true` if the lock save has matured, `false` otherwise
+    pub fn check_matured_lock(env: Env, lock_id: u64) -> bool {
+        lock::check_matured_lock(&env, lock_id)
+    }
+
+    /// Retrieves a lock save by ID
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `lock_id` - The ID of the lock save to retrieve
+    ///
+    /// # Returns
+    /// The LockSave struct if found, panics if not found
+    pub fn get_lock_save(env: Env, lock_id: u64) -> LockSave {
+        lock::get_lock_save(&env, lock_id)
+            .unwrap_or_else(|| panic_with_error!(&env, SavingsError::PlanNotFound))
+    }
+
+    /// Retrieves all lock save IDs for a user
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `user` - The user's address
+    ///
+    /// # Returns
+    /// Vector of lock save IDs owned by the user
+    pub fn get_user_lock_saves(env: Env, user: Address) -> Vec<u64> {
+        lock::get_user_lock_saves(&env, &user)
+    }
+
+    /// Withdraws from a matured lock save plan
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `user` - The user attempting to withdraw
+    /// * `lock_id` - The ID of the lock save to withdraw from
+    ///
+    /// # Returns
+    /// The amount withdrawn (including interest)
+    ///
+    /// # Panics
+    /// Panics if withdrawal conditions are not met
+    pub fn withdraw_lock_save(env: Env, user: Address, lock_id: u64) -> i128 {
+        lock::withdraw_lock_save(&env, user, lock_id).unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    // ========== Goal Save Functions ==========
+
+    pub fn create_goal_save(
+        env: Env,
+        user: Address,
+        goal_name: Symbol,
+        target_amount: i128,
+        initial_deposit: i128,
+    ) -> u64 {
+        goal::create_goal_save(&env, user, goal_name, target_amount, initial_deposit)
+            .unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    pub fn deposit_to_goal_save(env: Env, user: Address, goal_id: u64, amount: i128) {
+        goal::deposit_to_goal_save(&env, user, goal_id, amount)
+            .unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    pub fn withdraw_completed_goal_save(env: Env, user: Address, goal_id: u64) -> i128 {
+        goal::withdraw_completed_goal_save(&env, user, goal_id)
+            .unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    pub fn break_goal_save(env: Env, user: Address, goal_id: u64) {
+        goal::break_goal_save(&env, user, goal_id).unwrap_or_else(|e| panic_with_error!(&env, e))
+    }
+
+    pub fn get_goal_save(env: Env, goal_id: u64) -> GoalSave {
+        goal::get_goal_save(&env, goal_id)
+            .unwrap_or_else(|| panic_with_error!(&env, SavingsError::PlanNotFound))
+    }
+
+    pub fn get_user_goal_saves(env: Env, user: Address) -> Vec<u64> {
+        goal::get_user_goal_saves(&env, &user)
     }
 }
 

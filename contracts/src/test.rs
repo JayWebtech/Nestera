@@ -2,11 +2,13 @@
 extern crate std;
 
 use crate::{
-    MintPayload, NesteraContract, NesteraContractClient, PlanType, SavingsError, SavingsPlan, User,
+    flexi, DataKey, MintPayload, NesteraContract, NesteraContractClient, PlanType, SavingsError,
+    SavingsPlan, User,
 };
 use ed25519_dalek::{Signer, SigningKey};
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
-use soroban_sdk::{symbol_short, xdr::ToXdr, Address, Bytes, BytesN, Env};
+use soroban_sdk::{symbol_short, xdr::ToXdr, Address, Bytes, BytesN, Env, String};
+// use std::format;
 
 /// Helper function to create a test environment and contract client
 fn setup_test_env() -> (Env, NesteraContractClient<'static>) {
@@ -31,6 +33,20 @@ fn generate_keypair(env: &Env) -> (SigningKey, BytesN<32>) {
     let public_key_bytes: BytesN<32> = BytesN::from_array(env, &public_key.to_bytes());
 
     (signing_key, public_key_bytes)
+}
+
+fn test_address(id: u8) -> Address {
+    let env = Env::default();
+
+    // create a 32-byte array for the test
+    let mut b = [0u8; 32];
+    b[0] = id; // just make each test address unique
+
+    // convert BytesN to Bytes
+    let bytes = Bytes::from_array(&env, &b);
+
+    // create Address from Bytes (no Env argument!)
+    Address::from_string_bytes(&bytes)
 }
 
 /// Generate a second keypair (attacker) for testing wrong signer scenarios
@@ -951,4 +967,1453 @@ fn test_is_group_member() {
 
     // Check contribution
     assert_eq!(client.get_group_member_contribution(&group_id, &user), 500);
+}
+
+// #[test]
+// fn test_get_flexi_balance_user_not_found() {
+//     let env = Env::default();
+//     let user = test_address(2);
+
+//     // User not initialized
+//     assert_eq!(
+//         flexi::get_flexi_balance(&env, user.clone()),
+//         Err(SavingsError::UserNotFound)
+//     );
+
+//     // has_flexi_balance returns false for missing user balance
+//     assert_eq!(flexi::has_flexi_balance(&env, user.clone()), false);
+// }
+
+#[test]
+fn test_get_flexi_balance() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(NesteraContract, ());
+    let client = NesteraContractClient::new(&env, &contract_id);
+
+    let user = Address::generate(&env);
+
+    // 👇 REQUIRED: initialize user first
+    client.initialize_user(&user);
+
+    // then deposit
+    client.deposit_flexi(&user, &1000);
+
+    // view function
+    let balance = client.get_flexi_balance(&user);
+
+    assert_eq!(balance, 1000);
+}
+
+#[test]
+fn test_get_flexi_balance_user_not_found() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(NesteraContract, ());
+
+    let client = NesteraContractClient::new(&env, &contract_id);
+
+    let user = Address::generate(&env);
+
+    let result = client.try_get_flexi_balance(&user);
+    assert!(result.is_err());
+}
+
+// =============================================================================
+// Group Save Tests
+// =============================================================================
+
+#[test]
+fn test_create_group_save_success() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Emergency Fund");
+    let description = String::from_slice(&env, "Group emergency savings");
+    let category = String::from_slice(&env, "emergency");
+    let target_amount = 10000i128;
+    let contribution_type = 0u32; // Fixed
+    let contribution_amount = 100i128;
+    let is_public = true;
+    let start_time = 1000u64;
+    let end_time = 2000u64;
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &target_amount,
+        &contribution_type,
+        &contribution_amount,
+        &is_public,
+        &start_time,
+        &end_time,
+    );
+
+    assert_eq!(group_id, 1u64); // First group should have ID 1
+}
+
+#[test]
+fn test_create_group_save_stored_correctly() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "School Fees");
+    let description = String::from_slice(&env, "Save for school fees");
+    let category = String::from_slice(&env, "education");
+    let target_amount = 50000i128;
+    let contribution_type = 1u32; // Flexible
+    let contribution_amount = 500i128;
+    let is_public = false;
+    let start_time = 5000u64;
+    let end_time = 10000u64;
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &target_amount,
+        &contribution_type,
+        &contribution_amount,
+        &is_public,
+        &start_time,
+        &end_time,
+    );
+
+    // Verify the group was stored
+    let retrieved_group = client.get_group_save(&group_id);
+    assert!(retrieved_group.is_some());
+
+    let group = retrieved_group.unwrap();
+    assert_eq!(group.id, group_id);
+    assert_eq!(group.creator, creator);
+    assert_eq!(group.title, title);
+    assert_eq!(group.description, description);
+    assert_eq!(group.category, category);
+    assert_eq!(group.target_amount, target_amount);
+    assert_eq!(group.current_amount, 0i128); // Should start at 0
+    assert_eq!(group.contribution_type, contribution_type);
+    assert_eq!(group.contribution_amount, contribution_amount);
+    assert_eq!(group.is_public, is_public);
+    assert_eq!(group.member_count, 1u32); // Creator is first member
+    assert_eq!(group.start_time, start_time);
+    assert_eq!(group.end_time, end_time);
+    assert_eq!(group.is_completed, false);
+}
+
+#[test]
+fn test_create_group_save_creator_added_to_list() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Vacation Fund");
+    let description = String::from_slice(&env, "Save for vacation");
+    let category = String::from_slice(&env, "leisure");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Verify creator is in the user's groups list
+    let user_groups = client.get_user_groups(&creator);
+    assert_eq!(user_groups.len(), 1);
+    assert_eq!(user_groups.get(0).unwrap(), group_id);
+}
+
+#[test]
+fn test_create_group_save_auto_increment_ids() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator1 = Address::generate(&env);
+    let creator2 = Address::generate(&env);
+
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id_1 = client.create_group_save(
+        &creator1,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    let group_id_2 = client.create_group_save(
+        &creator2,
+        &title,
+        &description,
+        &category,
+        &20000i128,
+        &1u32,
+        &200i128,
+        &false,
+        &1000u64,
+        &2000u64,
+    );
+
+    assert_eq!(group_id_1, 1u64);
+    assert_eq!(group_id_2, 2u64);
+}
+
+#[test]
+fn test_create_group_save_invalid_target_amount() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Test");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    // Test with zero target_amount
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &0i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+
+    // Test with negative target_amount
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &-1000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_create_group_save_invalid_contribution_amount() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Test");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    // Test with zero contribution_amount
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &0i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+
+    // Test with negative contribution_amount
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &-100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_create_group_save_invalid_timestamps() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Test");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    // Test with start_time >= end_time
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &2000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+
+    // Test with start_time > end_time
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &3000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_create_group_save_invalid_contribution_type() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Test");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    // Test with invalid contribution_type (> 2)
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &3u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_create_group_save_empty_title() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "");
+    let description = String::from_slice(&env, "Test description");
+    let category = String::from_slice(&env, "test");
+
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_create_group_save_empty_description() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Test Title");
+    let description = String::from_slice(&env, "");
+    let category = String::from_slice(&env, "test");
+
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_create_group_save_empty_category() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Test Title");
+    let description = String::from_slice(&env, "Test description");
+    let category = String::from_slice(&env, "");
+
+    let result = client.try_create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_get_group_save_not_found() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let result = client.get_group_save(&999u64);
+    assert!(result.is_none());
+}
+
+#[test]
+fn test_group_exists() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Test");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    assert!(client.group_exists(&group_id));
+    assert!(!client.group_exists(&999u64));
+}
+
+#[test]
+fn test_get_user_groups_multiple() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let title = String::from_slice(&env, "Test");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    // Create multiple groups
+    let group_id_1 = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    let group_id_2 = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &20000i128,
+        &1u32,
+        &200i128,
+        &false,
+        &1000u64,
+        &2000u64,
+    );
+
+    let user_groups = client.get_user_groups(&creator);
+    assert_eq!(user_groups.len(), 2);
+    assert_eq!(user_groups.get(0).unwrap(), group_id_1);
+    assert_eq!(user_groups.get(1).unwrap(), group_id_2);
+}
+// Lock Save Tests
+// =============================================================================
+
+#[test]
+fn test_create_lock_save_success() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    // Initialize user first
+    client.initialize_user(&user);
+
+    let amount = 1000_i128;
+    let duration = 86400u64; // 1 day
+
+    let lock_id = client.create_lock_save(&user, &amount, &duration);
+    assert_eq!(lock_id, 1);
+
+    // Verify the lock save was created correctly
+    let lock_save = client.get_lock_save(&lock_id);
+    assert_eq!(lock_save.id, lock_id);
+    assert_eq!(lock_save.owner, user);
+    assert_eq!(lock_save.amount, amount);
+    assert_eq!(lock_save.interest_rate, 500); // Default 5%
+    assert!(!lock_save.is_withdrawn);
+
+    // Verify user has the lock save in their list
+    let user_locks = client.get_user_lock_saves(&user);
+    assert_eq!(user_locks.len(), 1);
+    assert_eq!(user_locks.get(0).unwrap(), lock_id);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #41)")]
+fn test_create_lock_save_invalid_amount() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    // Should panic with InvalidAmount error
+    client.create_lock_save(&user, &0, &86400u64);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #50)")]
+fn test_create_lock_save_invalid_duration() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    // Should panic with InvalidTimestamp error
+    client.create_lock_save(&user, &1000, &0);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #10)")]
+fn test_create_lock_save_user_not_found() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    // Don't initialize user - should panic with UserNotFound
+    client.create_lock_save(&user, &1000, &86400u64);
+}
+
+#[test]
+fn test_check_matured_lock_not_matured() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    let lock_id = client.create_lock_save(&user, &1000, &86400u64);
+
+    // Should not be matured immediately
+    assert!(!client.check_matured_lock(&lock_id));
+}
+
+#[test]
+fn test_check_matured_lock_matured() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    // Set initial timestamp
+    set_ledger_timestamp(&env, 1000);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    let lock_id = client.create_lock_save(&user, &1000, &100u64);
+
+    // Advance time past maturity
+    set_ledger_timestamp(&env, 1200); // 1000 + 100 + buffer
+
+    assert!(client.check_matured_lock(&lock_id));
+}
+
+#[test]
+fn test_check_matured_lock_nonexistent() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    // Non-existent lock should return false
+    assert!(!client.check_matured_lock(&999));
+}
+
+#[test]
+fn test_withdraw_lock_save_success() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    // Set initial timestamp
+    set_ledger_timestamp(&env, 1000);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    let lock_id = client.create_lock_save(&user, &1000, &100u64);
+
+    // Advance time past maturity
+    set_ledger_timestamp(&env, 1200);
+
+    let amount = client.withdraw_lock_save(&user, &lock_id);
+    assert!(amount >= 1000); // Should include some interest
+
+    // Verify lock save is marked as withdrawn
+    let lock_save = client.get_lock_save(&lock_id);
+    assert!(lock_save.is_withdrawn);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #51)")]
+fn test_withdraw_lock_save_not_matured() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    let lock_id = client.create_lock_save(&user, &1000, &86400u64);
+
+    // Should panic with TooEarly error
+    client.withdraw_lock_save(&user, &lock_id);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #23)")]
+fn test_withdraw_lock_save_already_withdrawn() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    // Set initial timestamp
+    set_ledger_timestamp(&env, 1000);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    let lock_id = client.create_lock_save(&user, &1000, &100u64);
+
+    // Advance time past maturity
+    set_ledger_timestamp(&env, 1200);
+
+    // First withdrawal should succeed
+    client.withdraw_lock_save(&user, &lock_id);
+
+    // Second withdrawal should panic with PlanCompleted
+    client.withdraw_lock_save(&user, &lock_id);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1)")]
+fn test_withdraw_lock_save_unauthorized() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    // Set initial timestamp
+    set_ledger_timestamp(&env, 1000);
+
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user1);
+    client.initialize_user(&user2);
+
+    let lock_id = client.create_lock_save(&user1, &1000, &100u64);
+
+    // Advance time past maturity
+    set_ledger_timestamp(&env, 1200);
+
+    // User2 trying to withdraw user1's lock save should panic with Unauthorized
+    client.withdraw_lock_save(&user2, &lock_id);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #20)")]
+fn test_withdraw_lock_save_plan_not_found() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    // Should panic with PlanNotFound
+    client.withdraw_lock_save(&user, &999);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #20)")]
+fn test_get_lock_save_plan_not_found() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    // Should panic with PlanNotFound
+    client.get_lock_save(&999);
+}
+
+#[test]
+fn test_multiple_lock_saves_unique_ids() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    let lock_id1 = client.create_lock_save(&user, &1000, &86400u64);
+    let lock_id2 = client.create_lock_save(&user, &2000, &172800u64);
+
+    assert_ne!(lock_id1, lock_id2);
+    assert_eq!(lock_id1, 1);
+    assert_eq!(lock_id2, 2);
+
+    // Verify user has both lock saves
+    let user_locks = client.get_user_lock_saves(&user);
+    assert_eq!(user_locks.len(), 2);
+
+    let mut lock_ids = std::vec::Vec::new();
+    for i in 0..user_locks.len() {
+        lock_ids.push(user_locks.get(i).unwrap());
+    }
+    assert!(lock_ids.contains(&lock_id1));
+    assert!(lock_ids.contains(&lock_id2));
+}
+
+#[test]
+fn test_lock_save_stores_correct_times() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let start_time = 1000u64;
+    let duration = 86400u64;
+    set_ledger_timestamp(&env, start_time);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    let lock_id = client.create_lock_save(&user, &1000, &duration);
+
+    let lock_save = client.get_lock_save(&lock_id);
+    assert_eq!(lock_save.start_time, start_time);
+    assert_eq!(lock_save.maturity_time, start_time + duration);
+}
+
+#[test]
+fn test_get_user_lock_saves_empty() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    // User with no lock saves should return empty vector
+    let user_locks = client.get_user_lock_saves(&user);
+    assert_eq!(user_locks.len(), 0);
+}
+
+#[test]
+fn test_lock_save_balance_update() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    // Set initial timestamp
+    set_ledger_timestamp(&env, 1000);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    let initial_amount = 1000_i128;
+    let lock_id = client.create_lock_save(&user, &initial_amount, &(365 * 24 * 3600)); // 1 year
+
+    // Advance time by 6 months
+    set_ledger_timestamp(&env, 1000 + (365 * 24 * 3600 / 2));
+
+    // Verify lock is not matured yet
+    assert!(!client.check_matured_lock(&lock_id));
+
+    // Advance time to full maturity
+    set_ledger_timestamp(&env, 1000 + (365 * 24 * 3600) + 1);
+
+    // Now it should be matured
+    assert!(client.check_matured_lock(&lock_id));
+
+    // Withdraw and verify interest was calculated
+    let final_amount = client.withdraw_lock_save(&user, &lock_id);
+    assert!(final_amount > initial_amount); // Should have earned interest
+}
+
+#[test]
+fn test_lock_save_wrong_plan_type() {
+    let (env, client) = setup_test_env();
+    let (_, admin_public_key) = generate_keypair(&env);
+
+    client.initialize(&admin_public_key);
+
+    let user = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize_user(&user);
+
+    // Create a regular savings plan
+    let savings_plan_id = client.create_savings_plan(&user, &PlanType::Flexi, &1000);
+
+    // Create a lock save
+    let lock_id = client.create_lock_save(&user, &1000, &86400u64);
+
+    // These should be different types of plans stored separately
+    // The savings plan ID and lock save ID can be the same since they're in different storage spaces
+
+    // Verify lock save exists and has correct data
+    let lock_save = client.get_lock_save(&lock_id);
+    assert_eq!(lock_save.id, lock_id);
+    assert_eq!(lock_save.amount, 1000);
+
+    // Verify savings plan exists and has correct data
+    let savings_plan = client.get_savings_plan(&user, &savings_plan_id).unwrap();
+    assert_eq!(savings_plan.plan_id, savings_plan_id);
+    assert_eq!(savings_plan.balance, 1000);
+
+    // They are different types of plans even if they have the same ID
+    // Lock saves are stored in DataKey::LockSave(id)
+    // Savings plans are stored in DataKey::SavingsPlan(user, id)
+}
+
+#[test]
+fn test_xdr_compatibility_lock_save() {
+    let env = Env::default();
+    let user = Address::generate(&env);
+
+    let lock_save = crate::LockSave {
+        id: 1,
+        owner: user,
+        amount: 1000,
+        interest_rate: 500,
+        start_time: 1000,
+        maturity_time: 2000,
+        is_withdrawn: false,
+    };
+
+    // Test XDR serialization/deserialization
+    let xdr_bytes = lock_save.to_xdr(&env);
+    assert!(!xdr_bytes.is_empty());
+
+    // This verifies the struct can be serialized to XDR format
+    // which is required for Soroban storage
+}
+
+// =============================================================================
+// Group Save Join and Contribute Tests
+// =============================================================================
+
+#[test]
+fn test_join_group_save_success() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let joiner = Address::generate(&env);
+
+    // Initialize both users
+    client.initialize_user(&creator);
+    client.initialize_user(&joiner);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true, // public
+        &1000u64,
+        &2000u64,
+    );
+
+    // Joiner joins the group
+    client.join_group_save(&joiner, &group_id);
+
+    // Verify group member count increased
+    let group = client.get_group_save(&group_id).unwrap();
+    assert_eq!(group.member_count, 2u32);
+
+    // Verify joiner is in the group members list
+    let members = client.get_group_members(&group_id);
+    assert_eq!(members.len(), 2);
+
+    // Verify joiner's contribution is initialized to 0
+    let contribution = client.get_member_contribution(&group_id, &joiner);
+    assert_eq!(contribution, 0i128);
+
+    // Verify joiner has the group in their list
+    let joiner_groups = client.get_user_groups(&joiner);
+    assert_eq!(joiner_groups.len(), 1);
+    assert_eq!(joiner_groups.get(0).unwrap(), group_id);
+}
+
+#[test]
+fn test_join_group_save_user_not_found() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let joiner = Address::generate(&env);
+
+    // Initialize only creator
+    client.initialize_user(&creator);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Joiner (not initialized) tries to join
+    let result = client.try_join_group_save(&joiner, &group_id);
+    assert_eq!(result, Err(Ok(SavingsError::UserNotFound)));
+}
+
+#[test]
+fn test_join_group_save_group_not_found() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let joiner = Address::generate(&env);
+    client.initialize_user(&joiner);
+
+    // Try to join non-existent group
+    let result = client.try_join_group_save(&joiner, &999u64);
+    assert_eq!(result, Err(Ok(SavingsError::PlanNotFound)));
+}
+
+#[test]
+fn test_join_group_save_private_group() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let joiner = Address::generate(&env);
+
+    client.initialize_user(&creator);
+    client.initialize_user(&joiner);
+
+    // Create a private group
+    let title = String::from_slice(&env, "Private Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &false, // private
+        &1000u64,
+        &2000u64,
+    );
+
+    // Joiner tries to join private group
+    let result = client.try_join_group_save(&joiner, &group_id);
+    assert_eq!(result, Err(Ok(SavingsError::InvalidGroupConfig)));
+}
+
+#[test]
+fn test_join_group_save_already_member() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+
+    client.initialize_user(&creator);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Creator tries to join again
+    let result = client.try_join_group_save(&creator, &group_id);
+    assert_eq!(result, Err(Ok(SavingsError::InvalidGroupConfig)));
+}
+
+#[test]
+fn test_contribute_to_group_save_success() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    client.initialize_user(&creator);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Creator contributes
+    client.contribute_to_group_save(&creator, &group_id, &500i128);
+
+    // Verify group current_amount updated
+    let group = client.get_group_save(&group_id).unwrap();
+    assert_eq!(group.current_amount, 500i128);
+    assert!(!group.is_completed);
+
+    // Verify creator's contribution updated
+    let contribution = client.get_member_contribution(&group_id, &creator);
+    assert_eq!(contribution, 500i128);
+}
+
+#[test]
+fn test_contribute_to_group_save_multiple_contributions() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    client.initialize_user(&creator);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Multiple contributions
+    client.contribute_to_group_save(&creator, &group_id, &300i128);
+    client.contribute_to_group_save(&creator, &group_id, &200i128);
+    client.contribute_to_group_save(&creator, &group_id, &500i128);
+
+    // Verify total contribution
+    let contribution = client.get_member_contribution(&group_id, &creator);
+    assert_eq!(contribution, 1000i128);
+
+    // Verify group current_amount
+    let group = client.get_group_save(&group_id).unwrap();
+    assert_eq!(group.current_amount, 1000i128);
+}
+
+#[test]
+fn test_contribute_to_group_save_goal_reached() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    client.initialize_user(&creator);
+
+    // Create a public group with low target
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &1000i128, // low target
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Contribute exactly the target amount
+    client.contribute_to_group_save(&creator, &group_id, &1000i128);
+
+    // Verify group is completed
+    let group = client.get_group_save(&group_id).unwrap();
+    assert_eq!(group.current_amount, 1000i128);
+    assert!(group.is_completed);
+}
+
+#[test]
+fn test_contribute_to_group_save_exceeds_goal() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    client.initialize_user(&creator);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &1000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Contribute more than target
+    client.contribute_to_group_save(&creator, &group_id, &1500i128);
+
+    // Verify group is completed and has excess
+    let group = client.get_group_save(&group_id).unwrap();
+    assert_eq!(group.current_amount, 1500i128);
+    assert!(group.is_completed);
+}
+
+#[test]
+fn test_contribute_to_group_save_invalid_amount() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    client.initialize_user(&creator);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Try to contribute zero
+    let result = client.try_contribute_to_group_save(&creator, &group_id, &0i128);
+    assert_eq!(result, Err(Ok(SavingsError::InvalidAmount)));
+
+    // Try to contribute negative
+    let result = client.try_contribute_to_group_save(&creator, &group_id, &-100i128);
+    assert_eq!(result, Err(Ok(SavingsError::InvalidAmount)));
+}
+
+#[test]
+fn test_contribute_to_group_save_not_member() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let non_member = Address::generate(&env);
+
+    client.initialize_user(&creator);
+    client.initialize_user(&non_member);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Non-member tries to contribute
+    let result = client.try_contribute_to_group_save(&non_member, &group_id, &500i128);
+    assert_eq!(result, Err(Ok(SavingsError::NotGroupMember)));
+}
+
+#[test]
+fn test_contribute_to_group_save_group_not_found() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let user = Address::generate(&env);
+    client.initialize_user(&user);
+
+    // Try to contribute to non-existent group
+    let result = client.try_contribute_to_group_save(&user, &999u64, &500i128);
+    assert_eq!(result, Err(Ok(SavingsError::PlanNotFound)));
+}
+
+#[test]
+fn test_multiple_members_contribute() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let member1 = Address::generate(&env);
+    let member2 = Address::generate(&env);
+
+    client.initialize_user(&creator);
+    client.initialize_user(&member1);
+    client.initialize_user(&member2);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Members join
+    client.join_group_save(&member1, &group_id);
+    client.join_group_save(&member2, &group_id);
+
+    // All contribute different amounts
+    client.contribute_to_group_save(&creator, &group_id, &1000i128);
+    client.contribute_to_group_save(&member1, &group_id, &2000i128);
+    client.contribute_to_group_save(&member2, &group_id, &3000i128);
+
+    // Verify individual contributions
+    assert_eq!(
+        client.get_member_contribution(&group_id, &creator),
+        1000i128
+    );
+    assert_eq!(
+        client.get_member_contribution(&group_id, &member1),
+        2000i128
+    );
+    assert_eq!(
+        client.get_member_contribution(&group_id, &member2),
+        3000i128
+    );
+
+    // Verify total group amount
+    let group = client.get_group_save(&group_id).unwrap();
+    assert_eq!(group.current_amount, 6000i128);
+    assert_eq!(group.member_count, 3u32);
+
+    // Verify all members are in the list
+    let members = client.get_group_members(&group_id);
+    assert_eq!(members.len(), 3);
+}
+
+#[test]
+fn test_get_group_members() {
+    let (env, client) = setup_test_env();
+    env.mock_all_auths();
+
+    let creator = Address::generate(&env);
+    let member1 = Address::generate(&env);
+
+    client.initialize_user(&creator);
+    client.initialize_user(&member1);
+
+    // Create a public group
+    let title = String::from_slice(&env, "Test Group");
+    let description = String::from_slice(&env, "Test");
+    let category = String::from_slice(&env, "test");
+
+    let group_id = client.create_group_save(
+        &creator,
+        &title,
+        &description,
+        &category,
+        &10000i128,
+        &0u32,
+        &100i128,
+        &true,
+        &1000u64,
+        &2000u64,
+    );
+
+    // Initially, only creator is a member
+    let members = client.get_group_members(&group_id);
+    assert_eq!(members.len(), 1);
+    assert_eq!(members.get(0).unwrap(), creator);
+
+    // Member joins
+    client.join_group_save(&member1, &group_id);
+
+    // Now there should be 2 members
+    let members = client.get_group_members(&group_id);
+    assert_eq!(members.len(), 2);
 }
