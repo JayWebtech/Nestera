@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use soroban_sdk::{
-    testutils::{Address as _, Ledger, LedgerInfo},
+    testutils::{Address as _, Ledger},
     Address, BytesN, Env, String as SorobanString, Symbol,
 };
 
@@ -38,7 +38,7 @@ fn setup_env() -> (
 
 #[test]
 fn test_user_lifecycle() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     // Initialize user
     client.initialize_user(&user1);
@@ -55,7 +55,7 @@ fn test_user_lifecycle() {
 #[test]
 #[should_panic]
 fn test_duplicate_user_initialization_fails() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     // First initialization should succeed
     client.initialize_user(&user1);
@@ -79,7 +79,7 @@ fn test_query_non_existent_user() {
 
 #[test]
 fn test_flexi_plan_full_flow() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     // Initialize user
     client.initialize_user(&user1);
@@ -108,7 +108,7 @@ fn test_flexi_plan_full_flow() {
 #[test]
 #[should_panic]
 fn test_flexi_withdraw_insufficient_balance() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
     client.deposit_flexi(&user1, &500);
@@ -120,7 +120,7 @@ fn test_flexi_withdraw_insufficient_balance() {
 #[test]
 #[should_panic]
 fn test_flexi_invalid_zero_deposit() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
 
@@ -131,7 +131,7 @@ fn test_flexi_invalid_zero_deposit() {
 #[test]
 #[should_panic]
 fn test_flexi_invalid_negative_deposit() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
 
@@ -253,7 +253,7 @@ fn test_lock_save_full_flow() {
 #[test]
 #[should_panic]
 fn test_lock_save_early_withdrawal_fails() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
     client.deposit_flexi(&user1, &5000);
@@ -266,7 +266,7 @@ fn test_lock_save_early_withdrawal_fails() {
 
 #[test]
 fn test_multiple_lock_saves() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
     client.deposit_flexi(&user1, &20000);
@@ -482,7 +482,7 @@ fn test_fee_configuration() {
 #[test]
 #[should_panic]
 fn test_fee_configuration_invalid() {
-    let (env, client, _admin, _user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, _user1, _user2, _user3) = setup_env();
 
     // Try to set invalid fee (> 10000 bps) - should panic
     client.set_early_break_fee_bps(&15000);
@@ -490,7 +490,7 @@ fn test_fee_configuration_invalid() {
 
 #[test]
 fn test_pause_and_unpause() {
-    let (env, client, admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
     client.deposit_flexi(&user1, &10000);
@@ -510,7 +510,7 @@ fn test_pause_and_unpause() {
 #[test]
 #[should_panic]
 fn test_operations_paused() {
-    let (env, client, admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
     client.deposit_flexi(&user1, &10000);
@@ -525,7 +525,7 @@ fn test_operations_paused() {
 #[test]
 #[should_panic]
 fn test_non_admin_cannot_pause() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     // Non-admin tries to pause - should panic
     client.pause(&user1);
@@ -533,7 +533,7 @@ fn test_non_admin_cannot_pause() {
 
 #[test]
 fn test_interest_rate_configuration() {
-    let (env, client, _admin, _user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, _user1, _user2, _user3) = setup_env();
 
     // Set rates for different plan types
     client.set_flexi_rate(&300); // 3%
@@ -557,7 +557,7 @@ fn test_interest_rate_configuration() {
 #[test]
 #[should_panic]
 fn test_invalid_zero_amount() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
 
@@ -568,7 +568,7 @@ fn test_invalid_zero_amount() {
 #[test]
 #[should_panic]
 fn test_invalid_negative_amount() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
 
@@ -579,7 +579,7 @@ fn test_invalid_negative_amount() {
 #[test]
 #[should_panic]
 fn test_insufficient_balance_withdrawal() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     client.initialize_user(&user1);
     client.deposit_flexi(&user1, &1000);
@@ -591,7 +591,7 @@ fn test_insufficient_balance_withdrawal() {
 #[test]
 #[should_panic]
 fn test_operations_on_non_existent_user() {
-    let (env, client, _admin, user1, _user2, _user3) = setup_env();
+    let (_env, client, _admin, user1, _user2, _user3) = setup_env();
 
     // Try deposit without initializing - should panic
     client.deposit_flexi(&user1, &1000);
@@ -688,7 +688,7 @@ fn test_complete_user_journey() {
     );
 
     // Step 3: Create a lock (this doesn't deduct from flexi balance either)
-    let lock_id = client.create_lock_save(&user1, &10000, &90);
+    let _lock_id = client.create_lock_save(&user1, &10000, &90);
     // Lock creation also manages funds internally
     let balance = client.get_flexi_balance(&user1);
     assert!(

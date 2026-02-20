@@ -1,5 +1,5 @@
 use crate::errors::SavingsError;
-use soroban_sdk::{Address, Env};
+// use soroban_sdk::{Address, Env};
 
 /// Validates that an amount is positive.
 pub fn assert_non_negative(amount: i128) -> Result<(), SavingsError> {
@@ -25,15 +25,15 @@ pub fn assert_sufficient_balance(balance: i128, amount: i128) -> Result<(), Savi
     Ok(())
 }
 
-/// Checks if the contract is currently paused.
-pub fn assert_not_paused(_env: &Env) -> Result<(), SavingsError> {
-    // This assumes you have a State or Config object in storage
-    // Example: let is_paused = env.storage().instance().get::<_, bool>(&DataKey::Paused).unwrap_or(false);
-    // if is_paused { return Err(SavingsError::ContractPaused); }
-    Ok(())
-}
+// Checks if the contract is currently paused.
+// pub fn assert_not_paused(_env: &Env) -> Result<(), SavingsError> {
+//     // This assumes you have a State or Config object in storage
+//     // Example: let is_paused = env.storage().instance().get::<_, bool>(&DataKey::Paused).unwrap_or(false);
+//     // if is_paused { return Err(SavingsError::ContractPaused); }
+//     Ok(())
+// }
 
-/// Checks for potential arithmetic overflow before it happens.
-pub fn check_add(a: i128, b: i128) -> Result<i128, SavingsError> {
-    a.checked_add(b).ok_or(SavingsError::Overflow)
-}
+// /// Checks for potential arithmetic overflow before it happens.
+// pub fn check_add(a: i128, b: i128) -> Result<i128, SavingsError> {
+//     a.checked_add(b).ok_or(SavingsError::Overflow)
+// }

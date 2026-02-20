@@ -16,7 +16,7 @@ fn setup() -> (Env, NesteraContractClient<'static>, Address) {
 
 #[test]
 fn test_default_rates_are_zero() {
-    let (env, client, _admin) = setup();
+    let (_env, client, _admin) = setup();
 
     // Default rates should be 0
     assert_eq!(client.get_flexi_rate(), 0);
@@ -31,7 +31,7 @@ fn test_default_rates_are_zero() {
 
 #[test]
 fn test_admin_can_set_rates() {
-    let (env, client, admin) = setup();
+    let (env, client, _admin) = setup();
 
     env.mock_all_auths();
 
@@ -60,7 +60,7 @@ fn test_admin_can_set_rates() {
 #[test]
 fn test_non_admin_cannot_set_rates() {
     let (env, client, _admin) = setup();
-    let user = Address::generate(&env);
+    let _user = Address::generate(&env);
 
     // Clear the "mock all" from setup so we can test failures
     env.mock_auths(&[]);

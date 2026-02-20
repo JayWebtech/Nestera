@@ -1,5 +1,5 @@
-use crate::storage_types::DataKey;
-use soroban_sdk::{contracttype, panic_with_error, Address, BytesN, Env}; // Assuming you have storage keys defined here
+// use crate::storage_types::DataKey;
+use soroban_sdk::{contracttype, Address, BytesN, Env}; // Assuming you have storage keys defined here, add panic with error when necessary
 
 #[contracttype]
 pub enum UpgradeDataKey {
@@ -44,7 +44,7 @@ pub fn upgrade_contract(env: &Env, admin: Address, new_wasm_hash: BytesN<32>) {
     set_version(env, new_version);
 }
 
-fn migrate(env: &Env, from_version: u32) {
+fn migrate(_env: &Env, _from_version: u32) {
     // Placeholder for future state migrations
     // Example: if from_version == 1 { ... upgrade storage structures ... }
 }

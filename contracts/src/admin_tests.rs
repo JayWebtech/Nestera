@@ -1,5 +1,5 @@
 use crate::{NesteraContract, NesteraContractClient, SavingsError};
-use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Error, InvokeError, Symbol};
+use soroban_sdk::{testutils::Address as _, Address, BytesN, Env}; // import Error, InvokeError, symbol when necessary
 
 fn setup() -> (Env, NesteraContractClient<'static>, Address) {
     let env = Env::default();
@@ -18,20 +18,20 @@ fn setup() -> (Env, NesteraContractClient<'static>, Address) {
 }
 
 /// Helper for functions that do NOT return Result in the contract (they panic)
-fn assert_panic_error(err: Result<Error, InvokeError>, expected: SavingsError) {
-    assert_eq!(err, Ok(Error::from_contract_error(expected as u32)));
-}
+// fn assert_panic_error(err: Result<Error, InvokeError>, expected: SavingsError) {
+//     assert_eq!(err, Ok(Error::from_contract_error(expected as u32)));
+// }
 
-/// Helper for functions that DO return Result<T, SavingsError> in the contract
-fn assert_savings_error(
-    err: Result<Result<u64, soroban_sdk::Val>, Result<SavingsError, InvokeError>>,
-    expected: SavingsError,
-) {
-    match err {
-        Err(Ok(actual_error)) => assert_eq!(actual_error, expected),
-        _ => panic!("Expected SavingsError: {:?}, but got {:?}", expected, err),
-    }
-}
+// /// Helper for functions that DO return Result<T, SavingsError> in the contract
+// fn assert_savings_error(
+//     err: Result<Result<u64, soroban_sdk::Val>, Result<SavingsError, InvokeError>>,
+//     expected: SavingsError,
+// ) {
+//     match err {
+//         Err(Ok(actual_error)) => assert_eq!(actual_error, expected),
+//         _ => panic!("Expected SavingsError: {:?}, but got {:?}", expected, err),
+//     }
+// }
 
 // Overload-like helpers for different return types (u64 vs i128 vs ())
 // If you have mixed return types, you may need a more generic match or individual helpers
