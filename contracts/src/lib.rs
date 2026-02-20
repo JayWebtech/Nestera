@@ -14,6 +14,7 @@ mod group;
 mod lock;
 mod storage_types;
 mod ttl;
+mod upgrade;
 mod users;
 
 mod rates;
@@ -622,6 +623,14 @@ impl NesteraContract {
     /// Unpauses the contract via config module (admin only)
     pub fn unpause_contract(env: Env, admin: Address) -> Result<(), SavingsError> {
         config::unpause_contract(&env, admin)
+    }
+
+    pub fn upgrade(env: Env, admin: Address, new_wasm_hash: BytesN<32>) {
+        upgrade::upgrade_contract(&env, admin, new_wasm_hash);
+    }
+
+    pub fn version(env: Env) -> u32 {
+        upgrade::get_version(&env)
     }
 }
 
