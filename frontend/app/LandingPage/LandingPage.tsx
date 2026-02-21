@@ -2,6 +2,7 @@ import React from 'react';
 import Hero from '../sections/Hero/Hero';
 import HowItWorks from '../components/HowItWorks';
 import FAQ from '../components/FAQ';
+import Footer from '../components/Footer';
 
 const LandingPage: React.FC = () => {
   return (
@@ -17,6 +18,7 @@ const LandingPage: React.FC = () => {
       />
       <HowItWorks />
       <FAQ />
+      <Footer />
     </main>
   );
 };
