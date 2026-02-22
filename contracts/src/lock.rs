@@ -64,6 +64,7 @@ pub fn create_lock_save(
     user_data.savings_count += 1;
     env.storage().persistent().set(&user_key, &user_data);
 
+    storage::award_deposit_points(env, user.clone(), amount)?;
     storage::award_long_lock_bonus(env, user.clone(), amount, duration)?;
 
     // Extend TTL for new lock save and user data
@@ -288,7 +289,8 @@ mod tests {
 
         let rewards = client.get_user_rewards(&user);
         // base points = 1000 * 10 = 10000, bonus = 20% = 2000
-        assert_eq!(rewards.total_points, 2_000);
+        // base points = 1000 * 10 = 10000, bonus = 20% = 2000
+        assert_eq!(rewards.total_points, 12_000);
     }
 
     #[test]
@@ -303,7 +305,8 @@ mod tests {
         client.create_lock_save(&user, &amount, &LONG_LOCK_BONUS_THRESHOLD_SECS);
 
         let rewards = client.get_user_rewards(&user);
-        assert_eq!(rewards.total_points, 0);
+        // base points = 1000 * 10 = 10000
+        assert_eq!(rewards.total_points, 10_000);
     }
 
     #[test]
@@ -319,7 +322,8 @@ mod tests {
         client.create_lock_save(&user, &amount, &below_threshold);
 
         let rewards = client.get_user_rewards(&user);
-        assert_eq!(rewards.total_points, 0);
+        // base points = 1000 * 10 = 10000
+        assert_eq!(rewards.total_points, 10_000);
     }
 
     #[test]
@@ -357,6 +361,7 @@ mod tests {
         let _ = client.withdraw_lock_save(&user, &lock_id);
 
         let rewards = client.get_user_rewards(&user);
-        assert_eq!(rewards.total_points, 2_000);
+        // base points = 1000 * 10 = 10000, bonus = 2000
+        assert_eq!(rewards.total_points, 12_000);
     }
 }
