@@ -1,4 +1,6 @@
 pub mod config;
+pub mod ranking;
+pub mod redemption;
 pub mod storage;
 pub mod storage_types;
 
@@ -6,7 +8,7 @@ pub mod storage_types;
 pub use config::*;
 pub use storage_types::{RewardsDataKey, UserRewards}; // Optional: re-exports config functions
 
-use soroban_sdk::{contracttype, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contracttype, Address};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
