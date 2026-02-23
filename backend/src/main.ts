@@ -23,4 +23,7 @@ async function bootstrap() {
   await app.listen(port || 3001);
   console.log(`Application is running on: http://localhost:${port}/api`);
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
