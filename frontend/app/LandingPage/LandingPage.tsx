@@ -1,18 +1,10 @@
-
-import React from 'react';
-import Hero from '../sections/Hero/Hero';
-import HowItWorks from '../components/HowItWorks';
-import FAQ from '../components/FAQ';
-
-import Footer from '../components/Footer';
-
-
 import React from "react";
 import Hero from "../sections/Hero/Hero";
-import SavingsProducts from "../components/SavingsProducts";
+import HowItWorks from "../components/HowItWorks";
 import FAQ from "../components/FAQ";
+import SavingsProducts from "../components/SavingsProducts";
 import Newsletter from "../components/Newsletter";
-
+import Footer from "../components/Footer";
 
 const LandingPage: React.FC = () => {
   return (
@@ -28,18 +20,12 @@ const LandingPage: React.FC = () => {
       />
 
       <HowItWorks />
-      <FAQ />
-      <Footer />
-
-
       <SavingsProducts />
-
       <FAQ />
       <Newsletter />
-
+      <Footer />
     </main>
   );
 };
 
 export default LandingPage;
-
