@@ -70,6 +70,31 @@ $ mau deploy
 
 With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
 
+## Running with Docker
+
+To start the backend and PostgreSQL database using Docker Compose:
+
+```bash
+# Build and start containers
+$ docker compose up --build
+```
+
+- The backend will be available at http://localhost:3000
+- The PostgreSQL database will be available at localhost:5432
+
+Environment variables for the database are set in docker-compose.yml:
+- POSTGRES_USER: nestera
+- POSTGRES_PASSWORD: nestera
+- POSTGRES_DB: nestera
+
+To stop and remove containers:
+
+```bash
+$ docker compose down
+```
+
+For development, you can modify the Dockerfile and docker-compose.yml as needed.
+
 ## Resources
 
 Check out a few resources that may come in handy when working with NestJS:
