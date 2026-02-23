@@ -20,8 +20,8 @@ const LandingPage: React.FC = () => {
         stat={{ label: "Annual Yield", value: "12% APY" }}
       />
 
-      <HowItWorks />
       <WhyTrust />
+      <HowItWorks />
       <SavingsProducts />
       <FAQ />
       <Newsletter />

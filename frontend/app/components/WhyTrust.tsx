@@ -18,9 +18,9 @@ const trustItems = [
       "Pennies per transaction, thanks to Soroban's efficiency.",
   },
   {
-    title: 'Fast Finality',
+    title: 'No Penalty',
     description:
-      'Settlement in seconds, not days. Access your funds when you need them.',
+      'No penalties or surprise charges; transparent contracts keep terms clear.',
   },
 ];
 
