@@ -17,101 +17,103 @@ process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
 process.env.JWT_SECRET = 'super-secret-key-for-testing-purposes_long_enough';
 
 describe('User Avatar (e2e)', () => {
-    let app: INestApplication;
-    const token = 'mock-token';
+  let app: INestApplication;
+  const token = 'mock-token';
 
-    const mockUser = {
-        id: 'user-123',
-        email: 'test@example.com',
-        name: 'Test User',
-        avatarUrl: null,
-    };
+  const mockUser = {
+    id: 'user-123',
+    email: 'test@example.com',
+    name: 'Test User',
+    avatarUrl: null,
+  };
 
-    const mockPrismaService = {
-        user: {
-            findUnique: jest.fn().mockResolvedValue(mockUser),
-            update: jest.fn().mockImplementation((args) =>
-                Promise.resolve({ ...mockUser, ...args.data })
-            ),
+  const mockPrismaService = {
+    user: {
+      findUnique: jest.fn().mockResolvedValue(mockUser),
+      update: jest
+        .fn()
+        .mockImplementation((args) =>
+          Promise.resolve({ ...mockUser, ...args.data }),
+        ),
+    },
+    $connect: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const testFilePath = join(__dirname, 'test-avatar.png');
+
+  beforeAll(async () => {
+    // Create a dummy image file for testing
+    // Using a very small but valid-looking (headers-wise) buffer might help if deep inspection is used
+    // But for now just fake it.
+    writeFileSync(testFilePath, Buffer.from('fake-image-content-png-mock'));
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          load: [() => ({ jwt: { secret: 'secret' } })],
+        }),
+        UserModule,
+        PrismaModule,
+      ],
+    })
+      .overrideProvider(PrismaService)
+      .useValue(mockPrismaService)
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          const req = context.switchToHttp().getRequest();
+          req.user = { id: mockUser.id, email: mockUser.email };
+          return true;
         },
-        $connect: jest.fn().mockResolvedValue(undefined),
-    };
+      })
+      .compile();
 
-    const testFilePath = join(__dirname, 'test-avatar.png');
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe());
+    await app.init();
+  });
 
-    beforeAll(async () => {
-        // Create a dummy image file for testing
-        // Using a very small but valid-looking (headers-wise) buffer might help if deep inspection is used
-        // But for now just fake it.
-        writeFileSync(testFilePath, Buffer.from('fake-image-content-png-mock'));
+  afterAll(async () => {
+    if (existsSync(testFilePath)) {
+      unlinkSync(testFilePath);
+    }
+    await app.close();
+  });
 
-        const moduleFixture: TestingModule = await Test.createTestingModule({
-            imports: [
-                ConfigModule.forRoot({
-                    isGlobal: true,
-                    load: [() => ({ jwt: { secret: 'secret' } })]
-                }),
-                UserModule,
-                PrismaModule,
-            ],
-        })
-            .overrideProvider(PrismaService)
-            .useValue(mockPrismaService)
-            .overrideGuard(JwtAuthGuard)
-            .useValue({
-                canActivate: (context: ExecutionContext) => {
-                    const req = context.switchToHttp().getRequest();
-                    req.user = { id: mockUser.id, email: mockUser.email };
-                    return true;
-                },
-            })
-            .compile();
+  it('/users/avatar (POST) - should upload avatar successfully', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/users/avatar')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('file', testFilePath);
 
-        app = moduleFixture.createNestApplication();
-        app.useGlobalPipes(new ValidationPipe());
-        await app.init();
-    });
+    if (res.status !== 201) {
+      console.log('Failing response body:', res.body);
+    }
 
-    afterAll(async () => {
-        if (existsSync(testFilePath)) {
-            unlinkSync(testFilePath);
-        }
-        await app.close();
-    });
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveProperty('avatarUrl');
+    expect(res.body.avatarUrl).toContain('/uploads/');
+  });
 
-    it('/users/avatar (POST) - should upload avatar successfully', async () => {
-        const res = await request(app.getHttpServer())
-            .post('/users/avatar')
-            .set('Authorization', `Bearer ${token}`)
-            .attach('file', testFilePath);
+  it('/users/avatar (POST) - should fail if file is missing', () => {
+    return request(app.getHttpServer())
+      .post('/users/avatar')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+  });
 
-        if (res.status !== 201) {
-            console.log('Failing response body:', res.body);
-        }
+  it('/users/avatar (POST) - should fail if file is not an image', () => {
+    const textFilePath = join(__dirname, 'test.txt');
+    writeFileSync(textFilePath, 'not an image');
 
-        expect(res.status).toBe(201);
-        expect(res.body).toHaveProperty('avatarUrl');
-        expect(res.body.avatarUrl).toContain('/uploads/');
-    });
-
-    it('/users/avatar (POST) - should fail if file is missing', () => {
-        return request(app.getHttpServer())
-            .post('/users/avatar')
-            .set('Authorization', `Bearer ${token}`)
-            .expect(400);
-    });
-
-    it('/users/avatar (POST) - should fail if file is not an image', () => {
-        const textFilePath = join(__dirname, 'test.txt');
-        writeFileSync(textFilePath, 'not an image');
-
-        return request(app.getHttpServer())
-            .post('/users/avatar')
-            .set('Authorization', `Bearer ${token}`)
-            .attach('file', textFilePath)
-            .expect(400)
-            .then(() => {
-                if (existsSync(textFilePath)) unlinkSync(textFilePath);
-            });
-    });
+    return request(app.getHttpServer())
+      .post('/users/avatar')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('file', textFilePath)
+      .expect(400)
+      .then(() => {
+        if (existsSync(textFilePath)) unlinkSync(textFilePath);
+      });
+  });
 });
