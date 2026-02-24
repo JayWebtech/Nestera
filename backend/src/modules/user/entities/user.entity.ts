@@ -23,6 +23,9 @@ export class User {
   @Column({ type: 'text', nullable: true })
   bio: string;
 
+  @Column({ nullable: true })
+  avatarUrl: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
