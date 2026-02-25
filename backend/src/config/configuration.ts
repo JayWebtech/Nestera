@@ -21,6 +21,7 @@ export default () => ({
     ) || [],
     contractId: process.env.CONTRACT_ID,
     webhookSecret: process.env.STELLAR_WEBHOOK_SECRET,
+    eventPollInterval: parseInt(process.env.STELLAR_EVENT_POLL_INTERVAL || '10000', 10),
     // Retry configuration
     rpcMaxRetries: parseInt(process.env.RPC_MAX_RETRIES || '3', 10),
     rpcRetryDelay: parseInt(process.env.RPC_RETRY_DELAY || '1000', 10),

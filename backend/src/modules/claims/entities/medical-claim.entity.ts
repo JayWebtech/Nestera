@@ -39,6 +39,9 @@ export class MedicalClaim {
   @Column({ nullable: true })
   notes: string;
 
+  @Column({ nullable: true })
+  blockchainTxHash: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
