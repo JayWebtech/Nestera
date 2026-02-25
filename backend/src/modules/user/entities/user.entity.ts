@@ -29,6 +29,9 @@ export class User {
   @Column({ nullable: true })
   avatarUrl: string;
 
+  @Column({ type: 'varchar', default: 'USER' })
+  role: 'USER' | 'ADMIN';
+
   @Column({ type: 'varchar', default: 'NOT_SUBMITTED' })
   kycStatus: 'NOT_SUBMITTED' | 'PENDING' | 'APPROVED' | 'REJECTED';
 

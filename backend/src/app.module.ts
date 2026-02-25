@@ -19,6 +19,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ClaimsModule } from './modules/claims/claims.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { AdminAnalyticsModule } from './modules/admin-analytics/admin-analytics.module';
+import { SavingsModule } from './modules/savings/savings.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { AdminAnalyticsModule } from './modules/admin-analytics/admin-analytics.
     ClaimsModule,
     DisputesModule,
     AdminAnalyticsModule,
+    SavingsModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

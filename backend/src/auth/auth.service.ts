@@ -36,7 +36,7 @@ export class AuthService {
 
     return {
       user,
-      accessToken: this.generateToken(user.id, user.email),
+      accessToken: this.generateToken(user.id, user.email, user.role),
     };
   }
 
@@ -47,7 +47,7 @@ export class AuthService {
     }
 
     return {
-      accessToken: this.generateToken(user.id, user.email),
+      accessToken: this.generateToken(user.id, user.email, user.role),
     };
   }
 
@@ -60,8 +60,8 @@ export class AuthService {
     return null;
   }
 
-  private generateToken(userId: string, email: string) {
-    return this.jwtService.sign({ sub: userId, email });
+  private generateToken(userId: string, email: string, role = 'USER') {
+    return this.jwtService.sign({ sub: userId, email, role });
   }
 
   async generateNonce(publicKey: string): Promise<{ nonce: string }> {
@@ -118,7 +118,7 @@ export class AuthService {
     }
 
     return {
-      accessToken: this.generateToken(user.id, user.email),
+      accessToken: this.generateToken(user.id, user.email, user.role),
     };
   }
 
